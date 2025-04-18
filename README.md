@@ -14,61 +14,52 @@ Before you begin, ensure the following are in place:
 - **Terraform**: Installed on your local machine. Download it from [terraform.io](https://www.terraform.io/downloads.html) if needed.
 - **SSH Key Pair**: An SSH key pair for secure access to the EC2 instance. The Terraform script assumes:
   - Public key at `/home/codespace/.ssh/id_rsa.pub`
-  - Private key at `/home/codespace/.ssh/id_rsa`
   
-  If your keys are stored elsewhere, update the `file()` paths in the `aws_key_pair` and `connection` blocks of the Terraform script.
-- **Flask App File**: The `app.py` file (provided below) must be present in the same directory as the Terraform files.
-
-### Flask Application (`app.py`)
-The following code should be saved as `app.py` in your working directory:
-```python
-from flask import Flask
-
-app = Flask(__name__)
-
-@app.route("/")
-def hello():
-    return "Hello, Chintan Boghara from Terraform!"
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=80)
-```
+  If your public key is stored elsewhere, update the `public_key_path` variable in `terraform.tfvars` or via command-line flags.
+- **Variables**: You can customize the deployment by setting variables such as `region`, `cidr`, `availability_zone`, and `allowed_ssh_cidr`. For better security, set `allowed_ssh_cidr` to your specific IP range.
 
 ## Setup
 
 Follow these steps to deploy the infrastructure and Flask application:
 
 1. **Navigate to the Directory**  
-   Open a terminal and change to the directory containing the Terraform files and `app.py`.
+   Open a terminal and change to the directory containing the Terraform files.
 
-2. **Initialize Terraform**  
+2. **Customize Variables (Optional)**  
+   You can customize the deployment by creating a `terraform.tfvars` file or using command-line flags. For example, to restrict SSH access to your IP:
+   ```hcl
+   allowed_ssh_cidr = "YOUR_IP/32"
+   ```
+   Replace `YOUR_IP` with your actual IP address.
+
+3. **Initialize Terraform**  
    This downloads the necessary provider plugins:
    ```bash
    terraform init
    ```
 
-3. **Review the Planned Changes**  
+4. **Review the Planned Changes**  
    Check what Terraform will create:
    ```bash
    terraform plan
    ```
 
-4. **Apply the Configuration**  
+5. **Apply the Configuration**  
    Deploy the infrastructure:
    ```bash
    terraform apply
    ```
    When prompted, type `yes` to confirm.
 
-5. **Access the Application**  
-   After the apply completes, Terraform will display the EC2 instance’s public IP in the output (assuming an output is defined, see Notes below). For example:
-   ```
-   Outputs:
+## Access the Application
 
-   instance_public_ip = "<EC2_PUBLIC_IP>"
-   ```
-   Open your browser and visit `http://<EC2_PUBLIC_IP>` to see the greeting message.  
-   *If no output is defined, you can find the public IP in the AWS Management Console under EC2 > Instances.*
+After the apply completes, Terraform will display the EC2 instance’s public IP in the output:
+```
+Outputs:
+
+instance_public_ip = "<EC2_PUBLIC_IP>"
+```
+Open your browser and visit `http://<EC2_PUBLIC_IP>` to see the greeting message.
 
 ## Cleanup
 
@@ -80,22 +71,7 @@ When prompted, type `yes` to confirm.
 
 ## Notes
 
-- **Region**: The script is configured for the `ap-south-1` region. To use a different region, update the `region` in the `provider "aws"` block and ensure the AMI ID (`ami-053b12d3152c0cc71`) matches an Ubuntu AMI available in that region.
-- **Security Group**: The configuration allows HTTP (port 80) and SSH (port 22) traffic from anywhere (`0.0.0.0/0`). For production use, restrict SSH access to specific IP ranges for better security.
-- **Output**: To make the public IP easily accessible, consider adding this to your Terraform script:
-  ```hcl
-  output "instance_public_ip" {
-    value = aws_instance.EC2-Ubuntu-for-terraform.public_ip
-  }
-  ```
-  This ensures the IP is displayed after `terraform apply`.
-
-## Infrastructure Overview
-
-The Terraform script provisions:
-- **VPC**: A Virtual Private Cloud with CIDR block `10.0.0.0/16`.
-- **Subnet**: A public subnet (`10.0.0.0/24`) in `ap-south-1a` with auto-assigned public IPs.
-- **Internet Gateway**: Enables internet access for the VPC.
-- **Route Table**: Routes traffic from the subnet to the internet.
-- **Security Group**: Permits inbound HTTP (port 80) and SSH (port 22) traffic.
-- **EC2 Instance**: A `t2.micro` instance running Ubuntu, with Flask installed and the app running on port 80.
+- **Dynamic AMI Selection**: The configuration uses a data source to fetch the latest Ubuntu 20.04 AMI, ensuring your instance always runs on an up-to-date image.
+- **User Data**: The Flask app is set up using the `user_data` attribute, which is more reliable and efficient than provisioners.
+- **Security**: The SSH ingress rule is restricted to the CIDR block specified in `allowed_ssh_cidr`. For production use, set this to your specific IP range.
+- **Customization**: You can customize variables like `region`, `cidr`, and `availability_zone` by setting them in a `terraform.tfvars` file or via command-line flags.
